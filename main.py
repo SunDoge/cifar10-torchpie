@@ -1,4 +1,7 @@
-from torchpie.environment import args
+from torchpie.config import config
+import torchpie.parallel as tpp
 
 if __name__ == "__main__":
-    print(args.config)
+    print(config)
+    print(config.get_string('arch'))
+    print(tpp.distributed)
