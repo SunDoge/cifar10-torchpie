@@ -3,3 +3,4 @@ torchpie
 output/
 exprs/
 __pycache__/
+data/

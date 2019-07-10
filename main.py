@@ -12,6 +12,7 @@ import time
 import torch
 from models import get_model
 from torch.nn.parallel import DistributedDataParallel
+from torchvision import datasets, transforms as T
 
 
 class AverageMeter:
@@ -147,16 +148,37 @@ def main():
     global best_acc, start_epoch
     model = get_model(config.get_string('arch'))
 
-    optimizer = optim.SGD()
+    optimizer = optim.SGD(model.parameters(), lr=0.1)
     criterion = nn.CrossEntropyLoss()
 
     if tpp.distributed:
         model = DistributedDataParallel(model, device_ids=[tpp.local_rank])
 
+    normalize = T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    train_transform = T.Compose([
+        T.ToTensor(),
+        normalize
+    ])
+
+    val_transform = T.Compose([
+        T.ToTensor(),
+        normalize
+    ])
+
+    train_loader = datasets.CIFAR10(
+        './data', train=True, transform=train_transform, download=True
+    )
+    val_loader = datasets.CIFAR10(
+        './data', train=False, transform=val_transform, download=False
+    )
+
     for epoch in range(start_epoch, config.get_int('num_epochs')):
 
-        train(model, None, criterion, optimizer, epoch)
-        acc1 = validate(model, None, epoch)
+        train(model, train_loader, criterion, optimizer, epoch)
+        acc1 = validate(model, val_loader, epoch)
+
+        is_best = acc1 > best_acc
+        best_acc = acc1 if is_best else best_acc
 
 
 if __name__ == "__main__":
