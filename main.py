@@ -144,7 +144,7 @@ def validate(model: nn.Module, loader, epoch):
 
 
 def main():
-
+    global best_acc, start_epoch
     model = get_model(config.get_string('arch'))
 
     optimizer = optim.SGD()
@@ -153,7 +153,10 @@ def main():
     if tpp.distributed:
         model = DistributedDataParallel(model, device_ids=[tpp.local_rank])
 
-    
+    for epoch in range(start_epoch, config.get_int('num_epochs')):
+
+        train(model, None, criterion, optimizer, epoch)
+        acc1 = validate(model, None, epoch)
 
 
 if __name__ == "__main__":
@@ -161,5 +164,8 @@ if __name__ == "__main__":
     if experiment_path is not None:
         writer = tpp.rank0_wrapper(SummaryWriter(
             log_dir=experiment_path), SummaryWriter)
+
+    best_acc = 0.0
+    start_epoch = 0
 
     main()
