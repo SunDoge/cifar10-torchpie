@@ -220,8 +220,7 @@ def main():
 if __name__ == "__main__":
 
     if experiment_path is not None:
-        writer = tpp.rank0_wrapper(SummaryWriter(
-            log_dir=experiment_path), SummaryWriter)
+        writer = tpp.rank0_obj(SummaryWriter(log_dir=experiment_path))
 
     best_acc1 = 0.0
     start_epoch = 0
