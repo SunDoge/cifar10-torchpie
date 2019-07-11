@@ -104,6 +104,8 @@ def train(model: nn.Module, loader, criterion, optimzier, epoch):
     writer.add_scalar('train/acc1', top1.avg, epoch)
     writer.add_scalar('train/acc5', top5.avg, epoch)
 
+    return top1.avg
+
 
 def validate(model: nn.Module, loader, epoch):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -151,8 +153,18 @@ def main():
 
     model.cuda()
 
-    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    optimizer = optim.SGD(
+        model.parameters(),
+        lr=config.get_float('optimizer.lr'),
+        momentum=config.get_float('optimizer.momentum'),
+        weight_decay=config.get_float('optimizer.weight_decay'),
+        nesterov=config.get_bool('optimizer.nesterov')
+    )
     criterion = nn.CrossEntropyLoss()
+    scheduler = optim.lr_scheduler.MultiStepLR(
+        optimizer,
+        config.get_list('scheduler.milestones')
+    )
 
     if tpp.distributed:
         model = DistributedDataParallel(model, device_ids=[tpp.local_rank])
@@ -169,18 +181,18 @@ def main():
     ])
 
     train_set = datasets.CIFAR10(
-        './data', train=True, transform=train_transform, download=True
+        config.get_string('dataset.root'), train=True, transform=train_transform, download=True
     )
     val_set = datasets.CIFAR10(
-        './data', train=False, transform=val_transform, download=False
+        config.get_string('dataset.root'), train=False, transform=val_transform, download=False
     )
 
     train_loader = DataLoader(train_set, batch_size=config.get_int(
-        'batch_size'), pin_memory=True, shuffle=True)
+        'dataloader.batch_size'), pin_memory=True, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.get_int(
-        'batch_size'), pin_memory=True)
+        'dataloader.batch_size'), pin_memory=True)
 
-    for epoch in range(start_epoch, config.get_int('num_epochs')):
+    for epoch in range(start_epoch, config.get_int('strategy.num_epochs')):
 
         train(model, train_loader, criterion, optimizer, epoch)
         acc1 = validate(model, val_loader, epoch)
