@@ -14,6 +14,7 @@ from models import get_model
 from torch.nn.parallel import DistributedDataParallel
 from torchvision import datasets, transforms as T
 from torch.utils.data import DataLoader
+from torchpie.checkpoint.saver import save_checkpoint
 
 
 class AverageMeter:
@@ -148,7 +149,7 @@ def validate(model: nn.Module, loader, epoch):
 
 
 def main():
-    global best_acc, start_epoch
+    global best_acc1, start_epoch
     model = get_model(config.get_string('arch'))
 
     model.cuda()
@@ -169,8 +170,13 @@ def main():
     if tpp.distributed:
         model = DistributedDataParallel(model, device_ids=[tpp.local_rank])
 
-    normalize = T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    normalize = T.Normalize(
+        config.get_list('dataset.mean'),
+        config.get_list('dataset.std')
+    )
     train_transform = T.Compose([
+        T.RandomCrop(32, padding=4),
+        T.RandomHorizontalFlip(),
         T.ToTensor(),
         normalize
     ])
@@ -196,9 +202,19 @@ def main():
 
         train(model, train_loader, criterion, optimizer, epoch)
         acc1 = validate(model, val_loader, epoch)
+        scheduler.step()
 
-        is_best = acc1 > best_acc
-        best_acc = acc1 if is_best else best_acc
+        is_best = acc1 > best_acc1
+        best_acc1 = max(acc1, best_acc1)
+
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'arch': config.get_string('arch'),
+            'state_dict': model.module.state_dict() if tpp.distributed else model.state_dict(),
+            'best_acc1': best_acc1,
+            'optimizer': optimizer.state_dict(),
+            'scheduler': scheduler.state_dict(),
+        }, is_best=is_best, folder=experiment_path)
 
 
 if __name__ == "__main__":
@@ -207,7 +223,7 @@ if __name__ == "__main__":
         writer = tpp.rank0_wrapper(SummaryWriter(
             log_dir=experiment_path), SummaryWriter)
 
-    best_acc = 0.0
+    best_acc1 = 0.0
     start_epoch = 0
 
     main()
