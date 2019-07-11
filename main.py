@@ -13,6 +13,7 @@ import torch
 from models import get_model
 from torch.nn.parallel import DistributedDataParallel
 from torchvision import datasets, transforms as T
+from torch.utils.data import DataLoader
 
 
 class AverageMeter:
@@ -72,7 +73,7 @@ def train(model: nn.Module, loader, criterion, optimzier, epoch):
 
     for i, (images, target) in enumerate(loader):
         images, target = images.cuda(
-            non_blocking=True), target.cuda(non_bloking=True)
+            non_blocking=True), target.cuda(non_blocking=True)
 
         output = model(images)
 
@@ -119,7 +120,7 @@ def validate(model: nn.Module, loader, epoch):
 
         for i, (images, target) in enumerate(loader):
             images, target = images.cuda(
-                non_blocking=True), target.cuda(non_bloking=True)
+                non_blocking=True), target.cuda(non_blocking=True)
 
             output = model(images)
 
@@ -148,6 +149,8 @@ def main():
     global best_acc, start_epoch
     model = get_model(config.get_string('arch'))
 
+    model.cuda()
+
     optimizer = optim.SGD(model.parameters(), lr=0.1)
     criterion = nn.CrossEntropyLoss()
 
@@ -165,12 +168,17 @@ def main():
         normalize
     ])
 
-    train_loader = datasets.CIFAR10(
+    train_set = datasets.CIFAR10(
         './data', train=True, transform=train_transform, download=True
     )
-    val_loader = datasets.CIFAR10(
+    val_set = datasets.CIFAR10(
         './data', train=False, transform=val_transform, download=False
     )
+
+    train_loader = DataLoader(train_set, batch_size=config.get_int(
+        'batch_size'), pin_memory=True, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=config.get_int(
+        'batch_size'), pin_memory=True)
 
     for epoch in range(start_epoch, config.get_int('num_epochs')):
 
