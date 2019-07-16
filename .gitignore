@@ -4,3 +4,6 @@ output/
 exprs/
 __pycache__/
 data/
+exps/
+.ipynb_checkpoints/
+*.lprof
