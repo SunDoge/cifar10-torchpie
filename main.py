@@ -172,9 +172,14 @@ def main():
 
     model.cuda()
 
+    learning_rate = config.get_float('optimizer.lr')
+    if tpp.distributed:
+        learning_rate = scale_lr(
+            learning_rate, config.get_int('dataloader.batch_size'))
+
     optimizer = optim.SGD(
         model.parameters(),
-        lr=config.get_float('optimizer.lr'),
+        lr=learning_rate,
         momentum=config.get_float('optimizer.momentum'),
         weight_decay=config.get_float('optimizer.weight_decay'),
         nesterov=config.get_bool('optimizer.nesterov')
@@ -237,6 +242,9 @@ def main():
 
     for epoch in range(start_epoch, config.get_int('strategy.num_epochs')):
         # for epoch in range(start_epoch, 1):
+
+        if tpp.distributed:
+            train_sampler.set_epoch(epoch)
 
         train(model, train_loader, criterion, optimizer, epoch)
         acc1 = validate(model, val_loader, epoch)
