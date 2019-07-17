@@ -1,23 +1,27 @@
 # Follow https://github.com/pytorch/examples/blob/master/imagenet/main.py
 
-from torchpie.config import config
-import torchpie.parallel as tpp
-from torchpie.parallel.reducer import reduce_tensor
-from torchpie.parallel.scaler import scale_lr
+import time
+
+import torch
+from torch import nn, optim
+from torch.nn.parallel import DistributedDataParallel
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import datasets
+from torchvision import transforms as T
+# import utils.transforms as UT
+# from datasets.cifar import CIFAR10
+from torchvision.datasets import CIFAR10
+
+import torchpie.parallel as tpp
+from models import get_model
+from torchpie.config import config
 from torchpie.environment import experiment_path
 from torchpie.logging import logger
-from torch import nn, optim
-import time
-import torch
-from models import get_model
-from torch.nn.parallel import DistributedDataParallel
-from torchvision import datasets, transforms as T
-from torch.utils.data import DataLoader
-from torchpie.checkpoint.saver import save_checkpoint
-import utils.transforms as UT
-from datasets.cifar import CIFAR10
-# from torchvision.datasets import CIFAR10
+from torchpie.parallel.reducer import reduce_tensor
+from torchpie.parallel.scaler import scale_lr
+from torchpie.utils.checkpoint import save_checkpoint
+from torch.utils.data.distributed import DistributedSampler
 
 
 class AverageMeter:
@@ -155,8 +159,9 @@ def validate(model: nn.Module, loader, epoch):
                 f'{batch_time}\t{losses}\t{top1}\t{top5}'
             )
 
-    writer.add_scalar('train/acc1', top1.avg, epoch)
-    writer.add_scalar('train/acc5', top5.avg, epoch)
+    writer.add_scalar('val/loss', losses.avg, epoch)
+    writer.add_scalar('val/acc1', top1.avg, epoch)
+    writer.add_scalar('val/acc5', top5.avg, epoch)
 
     return top1.avg
 
@@ -208,17 +213,36 @@ def main():
         config.get_string('dataset.root'), train=False, transform=val_transform, download=False
     )
 
-    train_loader = DataLoader(train_set, batch_size=config.get_int(
-        'dataloader.batch_size'), pin_memory=True, shuffle=True, num_workers=config.get_int('dataloader.num_workers'))
-    val_loader = DataLoader(val_set, batch_size=config.get_int(
-        'dataloader.batch_size'), pin_memory=True, num_workers=config.get_int('dataloader.num_workers'))
+    train_sampler = None
+    val_sampler = None
+    if tpp.distributed:
+        train_sampler = DistributedSampler(train_set)
+        val_sampler = DistributedSampler(val_set)
+
+    train_loader = DataLoader(
+        train_set,
+        batch_size=config.get_int('dataloader.batch_size'),
+        pin_memory=True,
+        shuffle=(train_sampler is None),
+        num_workers=config.get_int('dataloader.num_workers'),
+        sampler=train_sampler
+    )
+    val_loader = DataLoader(
+        val_set,
+        batch_size=config.get_int('dataloader.batch_size'),
+        pin_memory=True,
+        num_workers=config.get_int('dataloader.num_workers'),
+        sampler=val_sampler
+    )
 
     for epoch in range(start_epoch, config.get_int('strategy.num_epochs')):
-    # for epoch in range(start_epoch, 1):
+        # for epoch in range(start_epoch, 1):
 
         train(model, train_loader, criterion, optimizer, epoch)
         acc1 = validate(model, val_loader, epoch)
         scheduler.step()
+
+        writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
 
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
