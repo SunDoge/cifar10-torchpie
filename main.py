@@ -172,10 +172,10 @@ def main():
 
     model.cuda()
 
-    learning_rate = config.get_float('optimizer.lr')
-    if tpp.distributed:
-        learning_rate = scale_lr(
-            learning_rate, config.get_int('dataloader.batch_size'))
+    learning_rate = scale_lr(
+        config.get_float('optimizer.lr'),
+        config.get_int('dataloader.batch_size')
+    )
 
     optimizer = optim.SGD(
         model.parameters(),
