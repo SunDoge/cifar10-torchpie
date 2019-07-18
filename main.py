@@ -6,6 +6,7 @@ import torch
 from torch import nn, optim
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets
 from torchvision import transforms as T
@@ -18,34 +19,9 @@ from models import get_model
 from torchpie.config import config
 from torchpie.environment import experiment_path
 from torchpie.logging import logger
-from torchpie.parallel.reducer import reduce_tensor
-from torchpie.parallel.scaler import scale_lr
+from torchpie.meters import AverageMeter
+from torchpie.parallel.utils import reduce_tensor, scale_lr
 from torchpie.utils.checkpoint import save_checkpoint
-from torch.utils.data.distributed import DistributedSampler
-
-
-class AverageMeter:
-
-    def __init__(self, name, fmt=':f'):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(**self.__dict__)
 
 
 def accuracy(output, target, topk=(1,)):
