@@ -17,7 +17,7 @@ from torchvision.datasets import CIFAR10
 import torchpie.parallel as tpp
 from models import get_model
 from torchpie.config import config
-from torchpie.environment import experiment_path
+from torchpie.environment import experiment_path, args
 from torchpie.logging import logger
 from torchpie.meters import AverageMeter
 from torchpie.parallel.utils import reduce_tensor, scale_lr
@@ -244,11 +244,11 @@ def main():
 if __name__ == "__main__":
 
     if experiment_path is not None:
-        writer = tpp.rank0(SummaryWriter(log_dir=experiment_path))
+        # Create it when local_rank == 0
+        writer = tpp.rank0(lambda: SummaryWriter(log_dir=experiment_path))()
 
     best_acc1 = 0.0
     start_epoch = 0
 
     main()
-
     writer.close()
