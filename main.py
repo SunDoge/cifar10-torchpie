@@ -225,7 +225,7 @@ def main():
             train_sampler.set_epoch(epoch)
 
         train(model, train_loader, criterion, optimizer, epoch)
-        acc1 = validate(model, val_loader, epoch)
+        acc1 = validate(model, val_loader, criterion, epoch)
         scheduler.step()
 
         writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
