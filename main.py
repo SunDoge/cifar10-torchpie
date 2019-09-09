@@ -114,35 +114,34 @@ def validate(model: nn.Module, loader, criterion, epoch):
                 non_blocking=True), target.cuda(non_blocking=True)
 
             output = model(images)
-            # add loss
+
             loss = criterion(output, target)
 
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # ...
-        losses.update(loss.item(), images.size(0))
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
 
-    if tpp.distributed:
-        acc1 = reduce_tensor(acc1)
-        acc5 = reduce_tensor(acc5)
+            if tpp.distributed:
+                loss = reduce_tensor(loss)
+                acc1 = reduce_tensor(acc1)
+                acc5 = reduce_tensor(acc5)
 
-    batch_size = target.shape[0]
-    top1.update(acc1.item(), batch_size)
-    top5.update(acc5.item(), batch_size)
+            batch_size = target.shape[0]
+            losses.update(loss.item(), batch_size)
+            top1.update(acc1.item(), batch_size)
+            top5.update(acc5.item(), batch_size)
 
-    batch_time.update(time.time() - end)
-    end = time.time()
+            batch_time.update(time.time() - end)
+            end = time.time()
 
-    logger.info(
-        f'Epoch [{epoch}][{i}/{loader_len}]\t'
-        f'{batch_time}\t{losses}\t{top1}\t{top5}'
-    )
+            logger.info(
+                f'Epoch [{epoch}][{i}/{loader_len}]\t'
+                f'{batch_time}\t{losses}\t{top1}\t{top5}'
+            )
 
+    writer.add_scalar('val/loss', losses.avg, epoch)
+    writer.add_scalar('val/acc1', top1.avg, epoch)
+    writer.add_scalar('val/acc5', top5.avg, epoch)
 
-writer.add_scalar('val/loss', losses.avg, epoch)
-writer.add_scalar('val/acc1', top1.avg, epoch)
-writer.add_scalar('val/acc5', top5.avg, epoch)
-
-return top1.avg
+    return top1.avg
 
 
 def main():
