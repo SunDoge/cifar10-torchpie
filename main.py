@@ -43,7 +43,6 @@ def accuracy(output, target, topk=(1,)):
 
 # @profile
 def train(model: nn.Module, loader, criterion, optimzier, epoch):
-
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -111,39 +110,39 @@ def validate(model: nn.Module, loader, criterion, epoch):
         end = time.perf_counter()
 
         for i, (images, target) in enumerate(loader):
-
             images, target = images.cuda(
                 non_blocking=True), target.cuda(non_blocking=True)
 
             output = model(images)
-			#add loss
-			loss=criterion(output, target)
+            # add loss
+            loss = criterion(output, target)
 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-			#...
-			losses.update(loss.item(), images.size(0))
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        # ...
+        losses.update(loss.item(), images.size(0))
 
-            if tpp.distributed:
-                acc1 = reduce_tensor(acc1)
-                acc5 = reduce_tensor(acc5)
+    if tpp.distributed:
+        acc1 = reduce_tensor(acc1)
+        acc5 = reduce_tensor(acc5)
 
-            batch_size = target.shape[0]
-            top1.update(acc1.item(), batch_size)
-            top5.update(acc5.item(), batch_size)
+    batch_size = target.shape[0]
+    top1.update(acc1.item(), batch_size)
+    top5.update(acc5.item(), batch_size)
 
-            batch_time.update(time.time() - end)
-            end = time.time()
+    batch_time.update(time.time() - end)
+    end = time.time()
 
-            logger.info(
-                f'Epoch [{epoch}][{i}/{loader_len}]\t'
-                f'{batch_time}\t{losses}\t{top1}\t{top5}'
-            )
+    logger.info(
+        f'Epoch [{epoch}][{i}/{loader_len}]\t'
+        f'{batch_time}\t{losses}\t{top1}\t{top5}'
+    )
 
-    writer.add_scalar('val/loss', losses.avg, epoch)
-    writer.add_scalar('val/acc1', top1.avg, epoch)
-    writer.add_scalar('val/acc5', top5.avg, epoch)
 
-    return top1.avg
+writer.add_scalar('val/loss', losses.avg, epoch)
+writer.add_scalar('val/acc1', top1.avg, epoch)
+writer.add_scalar('val/acc5', top5.avg, epoch)
+
+return top1.avg
 
 
 def main():
