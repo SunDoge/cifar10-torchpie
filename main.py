@@ -97,7 +97,7 @@ def train(model: nn.Module, loader, criterion, optimzier, epoch):
     return top1.avg
 
 
-def validate(model: nn.Module, loader, epoch):
+def validate(model: nn.Module, loader,criterion,epoch):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -116,8 +116,12 @@ def validate(model: nn.Module, loader, epoch):
                 non_blocking=True), target.cuda(non_blocking=True)
 
             output = model(images)
+			#add loss
+			loss=criterion(output,target)
 
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
+			#...
+			losses.update(loss.item(),images.size(0))
 
             if tpp.distributed:
                 acc1 = reduce_tensor(acc1)
