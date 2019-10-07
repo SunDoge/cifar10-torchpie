@@ -205,7 +205,7 @@ def main():
     train_loader = DataLoader(
         train_set,
         batch_size=config.get_int('dataloader.batch_size'),
-        pin_memory=True,
+        pin_memory=config.get_bool('dataloader.pin_memory'),
         shuffle=(train_sampler is None),
         num_workers=config.get_int('dataloader.num_workers'),
         sampler=train_sampler
@@ -213,7 +213,7 @@ def main():
     val_loader = DataLoader(
         val_set,
         batch_size=config.get_int('dataloader.batch_size'),
-        pin_memory=True,
+        pin_memory=config.get_bool('dataloader.pin_memory'),
         num_workers=config.get_int('dataloader.num_workers'),
         sampler=val_sampler
     )
