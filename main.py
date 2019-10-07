@@ -43,7 +43,6 @@ def accuracy(output, target, topk=(1,)):
 
 # @profile
 def train(model: nn.Module, loader, criterion, optimzier, epoch):
-
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -97,7 +96,7 @@ def train(model: nn.Module, loader, criterion, optimzier, epoch):
     return top1.avg
 
 
-def validate(model: nn.Module, loader, epoch):
+def validate(model: nn.Module, loader, criterion, epoch):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -111,19 +110,22 @@ def validate(model: nn.Module, loader, epoch):
         end = time.perf_counter()
 
         for i, (images, target) in enumerate(loader):
-
             images, target = images.cuda(
                 non_blocking=True), target.cuda(non_blocking=True)
 
             output = model(images)
 
+            loss = criterion(output, target)
+
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
 
             if tpp.distributed:
+                loss = reduce_tensor(loss)
                 acc1 = reduce_tensor(acc1)
                 acc5 = reduce_tensor(acc5)
 
             batch_size = target.shape[0]
+            losses.update(loss.item(), batch_size)
             top1.update(acc1.item(), batch_size)
             top5.update(acc5.item(), batch_size)
 
@@ -223,7 +225,7 @@ def main():
             train_sampler.set_epoch(epoch)
 
         train(model, train_loader, criterion, optimizer, epoch)
-        acc1 = validate(model, val_loader, epoch)
+        acc1 = validate(model, val_loader, criterion, epoch)
         scheduler.step()
 
         writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
