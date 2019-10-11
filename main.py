@@ -150,6 +150,9 @@ def main():
 
     model.cuda()
 
+    model = torch.jit.script(model)
+    logger.info(model.graph)
+
     learning_rate = scale_lr(
         config.get_float('optimizer.lr'),
         config.get_int('dataloader.batch_size')
